@@ -1,0 +1,591 @@
+/* ===== Paleta Purple Tech ===== */
+:root {
+    --bg: #1A0F35;
+    /* fundo roxo escuro */
+    --panel: #241247;
+    /* painel vívido */
+    --text: #F4EFFF;
+    /* branco violeta */
+    --muted: #C7BEE6;
+    /* cinza-lilás */
+    --primary: #A78BFA;
+    /* roxo (violet 400/500) */
+    --primary-fg: #150B2E;
+    /* texto sobre o primário */
+    --outline: #3C2C66;
+    /* bordas frias */
+
+    --ok: #22C55E;
+    --warn: #F59E0B;
+    --error: #EF4444;
+    /* semânticas */
+
+    --bg-grad: radial-gradient(1200px 800px at 20% -10%, #5B21B6 0%, #3C1675 30%, #1A0F35 100%);
+    --glass: color-mix(in oklab, var(--panel) 75%, white 25%);
+    --veil: color-mix(in oklab, var(--primary) 12%, transparent);
+    --primary-hover: color-mix(in oklab, var(--primary) 92%, white);
+    --primary-active: color-mix(in oklab, var(--primary) 82%, black);
+}
+
+/* ===== Reset/estrutura ===== */
+* {
+    box-sizing: border-box
+}
+
+html,
+body {
+    height: 100%
+}
+
+body {
+    margin: 0;
+    color: var(--text);
+    font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Arial;
+    background: var(--bg-grad);
+}
+
+.container {
+    max-width: 1150px;
+    margin: 0 auto;
+    padding: 40px 20px 56px;
+}
+
+.hero-title {
+    font-size: clamp(36px, 6vw, 64px);
+    line-height: 1.05;
+    text-align: center;
+    margin: 0 0 24px;
+    letter-spacing: .5px;
+    text-shadow: 0 6px 30px rgba(0, 0, 0, .35);
+}
+
+.grid-2col {
+    display: grid;
+    gap: 28px;
+    grid-template-columns: 1fr minmax(380px, 520px);
+    align-items: start;
+}
+
+/* ===== Form ===== */
+.form {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--outline);
+    border-radius: 16px;
+    width: 30rem;
+    padding: 20px;
+    backdrop-filter: blur(8px);
+}
+
+.label {
+    display: block;
+    margin: 10px 0 6px;
+    color: var(--muted);
+    font-weight: 600;
+}
+
+.input {
+    width: 100%;
+    height: 44px;
+    border-radius: 12px;
+    border: 1px solid var(--outline);
+    background: rgba(0, 0, 0, .22);
+    color: var(--text);
+    padding: 8px 12px;
+}
+
+.input::placeholder {
+    color: color-mix(in oklab, var(--muted) 70%, transparent);
+}
+
+.field {
+    margin-top: 8px;
+}
+
+.grid-2 {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: 1fr 1fr;
+}
+
+.range-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+#down {
+    width: 100%;
+    accent-color: var(--primary);
+}
+
+#down-value {
+    min-width: 54px;
+    text-align: right;
+    color: var(--muted);
+}
+
+/* ===== Dropzone como input roxo ===== */
+.dropzone {
+    border: 1px dashed var(--outline);
+    border-radius: 14px;
+    padding: 14px;
+    text-align: center;
+    position: relative;
+    background: rgba(0, 0, 0, .16);
+    transition: border-color .2s, background .2s;
+}
+
+.dropzone.dragover {
+    border-color: var(--primary);
+    background: var(--veil);
+}
+
+.dz-instructions .hint {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.dz-preview {
+    margin-top: 6px;
+    position: relative;
+}
+
+.dz-video {
+    width: 100%;
+    max-height: 260px;
+    border-radius: 12px;
+    background: #000;
+}
+
+.dz-clear {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    z-index: 2;
+    border: 1px solid var(--outline);
+    border-radius: 50%;
+    background: rgba(0, 0, 0, .45);
+    color: var(--text);
+    font-size: 20px;
+    line-height: 28px;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+}
+
+.dz-clear:hover {
+    background: rgba(0, 0, 0, .6);
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* help chip (ícone + tooltip) */
+.with-help {
+    position: relative;
+}
+
+.help-chip {
+    position: absolute;
+    right: 8px;
+    top: -12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, .08);
+    border: 1px solid var(--outline);
+    border-radius: 12px;
+    padding: 6px 10px;
+}
+
+.help-chip .icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    font-size: 12px;
+    background: var(--primary);
+    color: var(--primary-fg);
+}
+
+.help-chip .help-body {
+    font-size: 12px;
+    color: var(--text);
+    opacity: .9;
+}
+
+/* ===== Botões ===== */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    user-select: none;
+    cursor: pointer;
+    border: 1px solid var(--outline);
+    background: transparent;
+    color: var(--text);
+    transition: transform .04s, background .15s, border-color .2s;
+}
+
+.btn:hover {
+    background: rgba(255, 255, 255, .05);
+}
+
+.btn:active {
+    transform: translateY(1px);
+}
+
+.btn[disabled] {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+.btn.primary {
+    background: var(--primary);
+    color: var(--primary-fg);
+    border-color: transparent;
+}
+
+.btn.primary:hover {
+    background: var(--primary-hover);
+}
+
+.btn.primary:active {
+    background: var(--primary-active);
+}
+
+.btn.large {
+    width: 100%;
+    margin-top: 18px;
+    height: 48px;
+    font-size: 16px;
+}
+
+.btn.soft {
+    background: rgba(255, 255, 255, .06);
+}
+
+/* ===== Status ===== */
+.status {
+    margin-top: 10px;
+    min-height: 24px;
+    color: var(--muted);
+}
+
+.status.ok {
+    color: var(--ok);
+}
+
+.status.error {
+    color: var(--error);
+}
+
+/* ===== Cards/Vídeo ===== */
+.video-card {
+    background: rgba(255, 255, 255, .06);
+    border: 1px solid var(--outline);
+    border-radius: 16px;
+    padding: 16px;
+    backdrop-filter: blur(8px);
+}
+
+.video-card h3 {
+    margin: 0 0 8px;
+    font-size: 16px;
+    color: var(--text);
+}
+
+.video {
+    width: 100%;
+    max-height: 340px;
+    border-radius: 12px;
+    background: #000;
+}
+
+.actions {
+    margin-top: 10px;
+}
+
+/* ===== Comparativo ===== */
+.compare {
+    margin-top: 26px;
+    display: grid;
+    gap: 16px;
+}
+
+@media (min-width: 900px) {
+    .compare {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.footer {
+    margin-top: 28px;
+    color: var(--muted);
+    text-align: center;
+}
+
+.file-info {
+    margin-top: 8px;
+    color: var(--muted);
+}
+
+/* força 3 colunas: FORM | ORIGINAL | PROCESSADO */
+.grid-3col {
+    display: grid;
+    grid-template-columns: minmax(320px, 380px) 1fr 1fr;
+    gap: 28px;
+    align-items: start;
+}
+
+/* evita quebra por overflow dentro dos cards de vídeo */
+.video-card {
+    min-width: 100px;
+}
+
+.video {
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+}
+
+/* se a tela for estreita, mantém 3 colunas com rolagem horizontal */
+@media (max-width: 1100px) {
+    .container {
+        overflow-x: auto;
+    }
+
+    .grid-3col {
+        min-width: 980px;
+    }
+
+    /* ajuste se quiser mais/menos largo */
+}
+
+/* 1) Deixa o container mais largo */
+.container {
+    max-width: 1480px;
+    /* antes: ~1080/1150 */
+    padding: 40px 24px 56px;
+}
+
+/* 2) Força 3 colunas com mais área para os vídeos */
+.grid-3col {
+    display: grid;
+    grid-template-columns: minmax(280px, 320px) 1.35fr 1.35fr;
+    /* form menor, vídeos maiores */
+    gap: 32px;
+    align-items: start;
+}
+
+/* 3) Vídeos GRANDES (sobrescreve qualquer regra anterior) */
+.video {
+    aspect-ratio: 16 / 9;
+    width: 100%;
+    height: auto;
+    max-height: clamp(480px, 55vh, 900px);
+    /* aumente/reduza a seu gosto */
+}
+
+/* 4) (Opcional) Não deixar os cards ficarem minúsculos */
+#col-original,
+#col-processed {
+    min-width: 480px;
+}
+
+/* 5) Em telas menores, prefira rolagem horizontal a encolher tudo */
+@media (max-width: 1200px) {
+    .container {
+        overflow-x: auto;
+    }
+
+    .grid-3col {
+        min-width: 1280px;
+    }
+
+    /* mantém os vídeos grandes */
+}
+
+/* === 3 colunas fixas de 40rem ========================================== */
+:root {
+    --colw: 30rem;
+    /* largura de cada card/coluna */
+    --gap: 2rem;
+    /* espaçamento entre colunas (≈32px) */
+}
+
+/* grade: Form | Original | Processado */
+.grid-3col {
+    display: grid;
+    grid-template-columns: var(--colw) var(--colw) var(--colw);
+    gap: var(--gap);
+    align-items: start;
+    justify-content: center;
+    /* centraliza quando houver espaço */
+    min-width: calc(var(--colw)*3 + var(--gap)*2);
+    /* evita “quebrar” as colunas */
+}
+
+/* deixe os cartões ocuparem exatamente 40rem */
+.form,
+#col-original,
+#col-processed,
+.grid-3col .video-card {
+    width: var(--colw);
+    max-width: var(--colw);
+    min-width: var(--colw);
+}
+
+/* vídeos ocupam a largura do card */
+.video {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+}
+
+/* se a viewport for menor que a soma das colunas, cria rolagem horizontal */
+.container {
+    max-width: initial;
+    /* solta o limite anterior */
+    overflow-x: auto;
+}
+
+/* linha do rótulo com ícone */
+.label-row {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin: 10px 0 6px;
+    /* combina com sua .label */
+}
+
+/* container do tooltip */
+.help-tooltip {
+    position: relative;
+    display: inline-block;
+}
+
+/* ? circular */
+.help-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    border: 1px solid var(--outline);
+    background: rgba(255, 255, 255, .08);
+    cursor: help;
+    user-select: none;
+}
+
+.help-icon:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+/* balão do tooltip */
+.tooltip {
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 10px);
+    transform: translateX(-50%) translateY(-6px);
+    padding: 8px 10px;
+    max-width: 260px;
+    border: 1px solid var(--outline);
+    border-radius: 10px;
+    background: color-mix(in oklab, var(--panel) 85%, black 15%);
+    color: var(--text);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
+    font-size: 12px;
+    line-height: 1.2;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s ease, transform .15s ease;
+    z-index: 10;
+    white-space: normal;
+}
+
+/* setinha do tooltip */
+.tooltip::after {
+    content: "";
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 10px;
+    height: 10px;
+    background: inherit;
+    border-left: 1px solid var(--outline);
+    border-top: 1px solid var(--outline);
+    transform: translateX(-50%) rotate(45deg);
+}
+
+/* mostrar no hover ou foco */
+.help-tooltip:hover .tooltip,
+.help-tooltip:focus-within .tooltip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    pointer-events: auto;
+}
+
+.progress-wrap {
+    margin-top: .75rem;
+}
+
+.progress-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: .9rem;
+    margin-bottom: .35rem;
+    color: #666;
+}
+
+.progress {
+    position: relative;
+    height: 10px;
+    background: #eee;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    width: 0%;
+    transition: width .15s ease;
+    background: linear-gradient(90deg, #6d28d9, #a78bfa);
+}
+
+.progress-indeterminate {
+    position: absolute;
+    top: 0;
+    left: -35%;
+    width: 35%;
+    height: 100%;
+    background: linear-gradient(90deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, .1), rgba(0, 0, 0, 0));
+    animation: indeterminate 1.1s infinite linear;
+}
+
+@keyframes indeterminate {
+    0% {
+        transform: translateX(0);
+    }
+
+    100% {
+        transform: translateX(300%);
+    }
+}
+
+.hidden {
+    display: none !important;
+}
