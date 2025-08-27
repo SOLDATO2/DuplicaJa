@@ -1,3 +1,5 @@
+import mimetypes
+import uuid
 from flask import Flask, render_template
 from model.model import FlowNet
 from contextlib import nullcontext
@@ -7,6 +9,8 @@ from model.util import interpolate_video
 import os
 import torch
 import tempfile
+from werkzeug.utils import secure_filename
+from werkzeug.exceptions import RequestEntityTooLarge
 
 torch.backends.cudnn.benchmark = True
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -19,13 +23,45 @@ model.eval()
 model.load_state_dict(torch.load("best_model.pth", map_location=device))
 print("Modelo carregado")
 
+
+# #region ================================================== CONFIG ==================================================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "var", "uploads")
+PROCESSED_FOLDER = os.path.join(BASE_DIR, "var", "processed")
+ALLOWED_EXTS = {".mp4", ".avi"}
+MAX_CONTENT_LENGTH = 1024 * 1024 * 1024  # 1 GiB
+
 app = Flask(__name__)
+app.config.update(
+    UPLOAD_FOLDER=UPLOAD_FOLDER,
+    PROCESSED_FOLDER=PROCESSED_FOLDER,
+    MAX_CONTENT_LENGTH=MAX_CONTENT_LENGTH,
+)
+
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(PROCESSED_FOLDER, exist_ok=True)
+
+def allowed_file(filename: str) -> bool:
+    ext = os.path.splitext(filename)[1].lower()
+    return ext in ALLOWED_EXTS
+
+@app.errorhandler(RequestEntityTooLarge)
+def handle_413(_e):
+    mb = MAX_CONTENT_LENGTH // (1024 * 1024)
+    return jsonify({"error": f"Arquivo muito grande. Limite: {mb} MB."}), 413
 
 
+# #endregion ========================================================================================================
 
-
-@app.route("/", methods=["GET"])
+# #region ================================================== ROTAS ==================================================
+@app.get("/")
 def index():
+    # Opcional: passe defaults para o template
+    return render_template("index.html", default_multi=1, default_down=0.25)
+
+# Mantive um formulário simples, sem template (útil para smoke tests)
+@app.get("/simple")
+def simple_form():
     return (
         "<h3>SimpleFlowNet - Interpolação de Vídeo</h3>"
         "<form method='POST' action='/interpolate' enctype='multipart/form-data'>"
@@ -36,6 +72,19 @@ def index():
         "<button type='submit'>Enviar</button>"
         "</form>"
     )
+
+# @app.route("/", methods=["GET"])
+# def index():
+#     return (
+#         "<h3>SimpleFlowNet - Interpolação de Vídeo</h3>"
+#         "<form method='POST' action='/interpolate' enctype='multipart/form-data'>"
+#         "Vídeo: <input type='file' name='video' accept='video/*' required><br/><br/>"
+#         "multi (int): <input type='number' name='multi' value='1'><br/>"
+#         "fps (int, opcional): <input type='number' name='fps'><br/>"
+#         "down (float): <input type='text' name='down' value='0.25'><br/>"
+#         "<button type='submit'>Enviar</button>"
+#         "</form>"
+#     )
 
 
 @app.route("/interpolate", methods=["POST"])
@@ -103,7 +152,7 @@ def interpolate_route():
     resp.headers['X-Avg-FPS'] = f"{avg_fps:.2f}"
     resp.headers['X-Frames'] = str(frames)
     return resp
-
+# #endregion ========================================================================================================
 
 if __name__ == "__main__":
     app.run(debug=True, threaded=False)

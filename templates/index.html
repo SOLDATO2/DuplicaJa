@@ -1,10 +1,167 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-br">
+
 <head>
-    <meta charset="UTF-8">
-    <title>Anexar Vídeo</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Interpolação de Frames</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='bg.css') }}" />
 </head>
+
 <body>
-    <h1>Anexar Vídeo</h1>
+    <div class="background">
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+    </div>
+    <main class="container">
+        <h1 class="hero-title">Interpolação de Frames</h1>
+
+        <!-- GRADE 3 COLUNAS: FORM | ORIGINAL | PROCESSADO -->
+        <section class="grid-3col">
+            <!-- 1) FORM -->
+            <form class="form" onsubmit="return false">
+                <label class="label">Vídeo:</label>
+                <div id="dropzone" class="dropzone" tabindex="0">
+                    <div id="dz-instructions" class="dz-instructions">
+                        <button type="button" class="btn soft" onclick="document.getElementById('file-input').click()">
+                            Escolher arquivo
+                        </button>
+                        <input id="file-input" type="file" accept="video/mp4,video/x-msvideo,video/avi" hidden />
+                        <p class="hint">MP4 ou AVI • até 1 GB</p>
+                    </div>
+
+                    <!-- prévia dentro do input -->
+                    <div id="dz-preview" class="dz-preview hidden">
+                        <button id="dz-clear" class="dz-clear" type="button" aria-label="Remover vídeo">&times;</button>
+                        <video id="dz-video" class="dz-video" controls preload="metadata"></video>
+                    </div>
+                </div>
+                <div id="file-info" class="file-info hidden"></div>
+
+                <div class="field">
+                    <div class="label-row">
+                        <label for="multi" class="label">multi (int)</label>
+
+                        <!-- ícone ? com tooltip -->
+                        <span class="help-tooltip">
+                            <span class="help-icon" tabindex="0" aria-describedby="tt-multi">?</span>
+                            <span id="tt-multi" role="tooltip" class="tooltip">Multiplica os frames interpolados</span>
+                        </span>
+                    </div>
+
+                    <div class="with-help">
+                        <input id="multi" type="number" min="1" step="1" class="input" placeholder="ex.: 2" />
+                    </div>
+
+                </div>
+
+                <div class="field grid-2">
+                    <div>
+                        <label for="fps" class="label">fps (int, opcional)</label>
+                        <input id="fps" type="number" min="1" step="1" class="input" placeholder="ex.: 60" />
+                    </div>
+                    <div>
+                        <label for="down" class="label">down (float)</label>
+                        <div class="range-wrap">
+                            <input id="down" type="range" min="0.25" max="1" step="0.25" value="1" list="marks" />
+                            <output id="down-value">100%</output>
+                        </div>
+                        <datalist id="marks">
+                            <option value="0.25" label="25%"></option>
+                            <option value="0.5" label="50%"></option>
+                            <option value="0.75" label="75%"></option>
+                            <option value="1" label="100%"></option>
+                        </datalist>
+                    </div>
+                </div>
+
+                <button id="send-btn" class="btn primary large" disabled>Enviar</button>
+                <!-- Barra de progresso -->
+                <div id="progress-wrap" class="progress-wrap hidden" aria-live="polite">
+                    <div class="progress-header">
+                        <span id="p-label">Aguardando arquivo…</span>
+                        <span id="p-percent">0%</span>
+                    </div>
+                    <div class="progress">
+                        <div id="p-bar" class="progress-bar"></div>
+                        <div id="p-ind" class="progress-indeterminate hidden"></div>
+                    </div>
+                </div>
+
+                <div id="status" class="status" aria-live="polite"></div>
+            </form>
+
+            <!-- 2) ORIGINAL -->
+            <aside id="col-original" class="video-card hidden">
+                <h3>Original</h3>
+                <video id="original" class="video" controls preload="metadata"></video>
+            </aside>
+
+            <!-- 3) PROCESSADO -->
+            <aside id="col-processed" class="video-card hidden">
+                <h3>Processado</h3>
+                <video id="processed" class="video" controls preload="metadata"></video>
+                <div class="actions">
+                    <a id="download-link" class="btn outline" href="#" download>Baixar processado</a>
+                </div>
+            </aside>
+        </section>
+
+        <footer class="footer">
+        </footer>
+    </main>
+
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
+
 </html>
