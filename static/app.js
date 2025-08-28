@@ -226,7 +226,7 @@ sendBtn.addEventListener("click", () => {
 	if (!Number.isNaN(m)) fd.append("multi", String(Math.max(1, m)));
 	const f = parseInt(fpsInput.value, 10);
 	if (!Number.isNaN(f)) fd.append("fps", String(f));
-	fd.append("down", String(parseFloat(downRange.value)));
+	fd.append("down", String(parseFloat(downRange.value) * 0.25)); 
 
 	const xhr = new XMLHttpRequest();
 	xhr.open("POST", "/interpolate");

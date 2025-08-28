@@ -13,7 +13,7 @@ from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
 
 torch.backends.cudnn.benchmark = True
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
 print(f"Usando: {device}")
 
 model = FlowNet(base=16).to(device)
@@ -155,4 +155,4 @@ def interpolate_route():
 # #endregion ========================================================================================================
 
 if __name__ == "__main__":
-    app.run(debug=True, threaded=False)
+    app.run(debug=True, threaded=True)
