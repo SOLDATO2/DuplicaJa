@@ -1,16 +1,18 @@
 import mimetypes
 import uuid
-from flask import Flask, render_template
+from flask import Flask, render_template, redirect, url_for
 from model.model import FlowNet
 from contextlib import nullcontext
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from flask import Flask, request, send_file, jsonify, abort
+from pathlib import Path
 from model.util import interpolate_video
 import os
 import torch
 import tempfile
 from werkzeug.utils import secure_filename
-from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.exceptions import RequestEntityTooLarge, HTTPException
+from api_jobs import jobs_bp
 
 torch.backends.cudnn.benchmark = True
 device = torch.device("cpu")
@@ -32,11 +34,17 @@ ALLOWED_EXTS = {".mp4", ".avi"}
 MAX_CONTENT_LENGTH = 1024 * 1024 * 1024  # 1 GiB
 
 app = Flask(__name__)
+app.register_blueprint(jobs_bp, url_prefix="/api")
+
 app.config.update(
     UPLOAD_FOLDER=UPLOAD_FOLDER,
     PROCESSED_FOLDER=PROCESSED_FOLDER,
     MAX_CONTENT_LENGTH=MAX_CONTENT_LENGTH,
 )
+
+@app.errorhandler(HTTPException)
+def _http_error(e: HTTPException):
+    return jsonify({"code": "ERROR", "message": e.description or e.name, "details": None}), e.code or 500
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(PROCESSED_FOLDER, exist_ok=True)
@@ -54,10 +62,28 @@ def handle_413(_e):
 # #endregion ========================================================================================================
 
 # #region ================================================== ROTAS ==================================================
+
 @app.get("/")
 def index():
     # Opcional: passe defaults para o template
     return render_template("index.html", default_multi=1, default_down=0.25)
+
+# ------ Rota de upload (o front manda o arquivo aqui antes do /api/jobs) ------
+UPLOAD_DIR = Path("static/uploads"); UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+@app.post("/upload")
+def upload():
+    if "file" in request.files:
+        f = request.files["file"]
+    elif "video" in request.files:  # compatibilidade com seu app.js antigo
+        f = request.files["video"]
+    else:
+        return jsonify({"code":"ERROR","message":"campo 'file' não encontrado","details":None}), 400
+
+    fname = secure_filename(f.filename or "video.mp4")
+    savepath = (UPLOAD_DIR / fname).resolve()
+    f.save(savepath)
+    return jsonify({"filename": fname})
 
 # Mantive um formulário simples, sem template (útil para smoke tests)
 @app.get("/simple")

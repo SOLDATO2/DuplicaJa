@@ -10,6 +10,7 @@ const multiInput = document.getElementById("multi");
 const fpsInput = document.getElementById("fps");
 const downRange = document.getElementById("down");
 const downValue = document.getElementById("down-value");
+const presetSel = document.getElementById("preset");
 
 const sendBtn = document.getElementById("send-btn");
 const statusEl = document.getElementById("status");
@@ -20,15 +21,68 @@ const originalVideo = document.getElementById("original");
 const colProcessed = document.getElementById("col-processed");
 const processedVideo = document.getElementById("processed");
 const downloadLink = document.getElementById("download-link");
+const cancelBtn = document.getElementById("cancel-btn");
+
+presetSel?.addEventListener("change", () => {
+	const v = presetSel.value;
+	if (v === "youtube_60fps") {
+		multiInput.value = "2";
+		fpsInput.value = "60";
+		downRange.value = "1";
+		downValue.textContent = "100%";
+	} else if (v === "stories_30fps") {
+		multiInput.value = "1";
+		fpsInput.value = "30";
+		downRange.value = "0.75";
+		downValue.textContent = "75%";
+	} else if (v === "qualidade_120") {
+		multiInput.value = "4";   // exemplo (30->120)
+		fpsInput.value = "120";
+		downRange.value = "1";
+		downValue.textContent = "100%";
+	} else if (v === "mobile_leve") {
+		multiInput.value = "2";
+		fpsInput.value = "48";
+		downRange.value = "0.5";
+		downValue.textContent = "50%";
+	}
+});
 
 // ======= estado =======
-const MAX_MB = 1024; // 1 GiB
+const MAX_MB = 1024;
 const ALLOWED_EXTS = [".mp4", ".avi"];
 let selectedFile = null;
 let originalUrl = null;
-let processedUrl = null;
+let currentJob = null;
+let stopPolling = false;
+let processedObjectUrl = null;
 
 // ======= utils =======
+function showCancel() { cancelBtn?.classList.remove("hidden"); cancelBtn.disabled = false; }
+function hideCancel() { cancelBtn?.classList.add("hidden"); }
+
+async function cancelCurrentJob() {
+	if (!currentJob) return;
+	cancelBtn.disabled = true;
+	try {
+		const r = await fetch(`/api/jobs/${currentJob.id}/cancel?token=${encodeURIComponent(currentJob.token)}`, { method: "POST" });
+		const j = await r.json();
+		if (!r.ok || j.code === "ERROR") throw new Error(j.message || "Falha ao cancelar");
+		setStatus("Job cancelado", "warning");
+		hideProgress();
+		hideCancel();
+		colProcessed.classList.add("hidden");
+		stopPolling = true; // (opcional) corta o laço do poll imediatamente
+		setTimeout(() => {
+			location.reload();
+		}, 300);
+	} catch (e) {
+		setStatus(e.message || "Erro ao cancelar", "error");
+		cancelBtn.disabled = false;
+	}
+}
+cancelBtn?.addEventListener("click", cancelCurrentJob);
+
 function setStatus(msg, cls = "") {
 	statusEl.className = `status ${cls}`;
 	statusEl.textContent = msg;
@@ -52,78 +106,14 @@ function hideDropPreview() {
 	dzPreview.classList.add("hidden");
 	dzInstructions.classList.remove("hidden");
 }
-function parseFilenameFromContentDisposition(cd) {
-	if (!cd) return null;
-	const m = /filename\*?=(?:UTF-8''|")?([^";]+)"?/i.exec(cd);
-	return m ? decodeURIComponent(m[1]) : null;
-}
-function readBlobAsText(blob, cb) {
-	const fr = new FileReader();
-	fr.onload = () => cb(null, fr.result);
-	fr.onerror = () => cb(fr.error || new Error("Falha ao ler resposta"));
-	fr.readAsText(blob);
-}
-
-// ======= barra de progresso (auto-injetada) =======
-let progressWrap, pBar, pInd, pLabel, pPercent;
-
-(function ensureProgressUI() {
-	// injeta CSS
-	if (!document.getElementById("progress-styles")) {
-		const style = document.createElement("style");
-		style.id = "progress-styles";
-		style.textContent = `
-      .progress-wrap{margin-top:.75rem}
-      .progress-header{display:flex;justify-content:space-between;font-size:.9rem;margin-bottom:.35rem;color:#666}
-      .progress{position:relative;height:10px;background:#eee;border-radius:999px;overflow:hidden}
-      .progress-bar{height:100%;width:0%;transition:width .15s ease;background:linear-gradient(90deg,#6d28d9,#a78bfa)}
-      .progress-indeterminate{position:absolute;top:0;left:-35%;width:35%;height:100%;
-        background:linear-gradient(90deg,rgba(0,0,0,0),rgba(0,0,0,.1),rgba(0,0,0,0));
-        animation:indeterminate 1.1s infinite linear}
-      @keyframes indeterminate{0%{transform:translateX(0)}100%{transform:translateX(300%)}}
-      .hidden{display:none!important}
-    `;
-		document.head.appendChild(style);
-	}
-
-	// cria HTML antes do #status
-	progressWrap = document.createElement("div");
-	progressWrap.id = "progress-wrap";
-	progressWrap.className = "progress-wrap hidden";
-	progressWrap.setAttribute("aria-live", "polite");
-	progressWrap.innerHTML = `
-    <div class="progress-header">
-      <span id="p-label">Aguardando arquivo…</span>
-      <span id="p-percent">0%</span>
-    </div>
-    <div class="progress">
-      <div id="p-bar" class="progress-bar"></div>
-      <div id="p-ind" class="progress-indeterminate hidden"></div>
-    </div>
-  `;
-	statusEl.parentNode.insertBefore(progressWrap, statusEl);
-
-	// refs internas
-	pBar = progressWrap.querySelector("#p-bar");
-	pInd = progressWrap.querySelector("#p-ind");
-	pLabel = progressWrap.querySelector("#p-label");
-	pPercent = progressWrap.querySelector("#p-percent");
-})();
-
-function showProgress() { progressWrap.classList.remove("hidden"); }
-function hideProgress() { progressWrap.classList.add("hidden"); setProgress(0, "Aguardando arquivo…"); stopIndeterminate(); }
-function setProgress(pct, label) {
-	const v = Math.max(0, Math.min(100, Math.round(pct)));
-	pBar.style.width = v + "%";
-	if (label) pLabel.textContent = label;
-	pPercent.textContent = v + "%";
-}
-function startIndeterminate(label) {
-	pInd.classList.remove("hidden");
-	pLabel.textContent = label || "Processando…";
-	pPercent.textContent = "…";
-}
-function stopIndeterminate() { pInd.classList.add("hidden"); }
+// ======= progresso simples =======
+const pWrap = document.getElementById("progress-wrap");
+const pBar = document.getElementById("p-bar");
+const pLabel = document.getElementById("p-label");
+const pPct = document.getElementById("p-percent");
+function showProgress() { pWrap.classList.remove("hidden"); }
+function hideProgress() { pWrap.classList.add("hidden"); setProgress(0, "Aguardando arquivo…"); }
+function setProgress(pct, label) { const v = Math.max(0, Math.min(100, Math.round(pct))); pBar.style.width = v + "%"; if (label) pLabel.textContent = label; pPct.textContent = v + "%"; }
 
 // ======= limpar seleção =======
 function clearUploadSelection() {
@@ -139,34 +129,27 @@ function clearUploadSelection() {
 	setStatus("Selecione um vídeo para começar.");
 	hideProgress();
 }
-if (dzClear) {
-	dzClear.addEventListener("click", (e) => { e.stopPropagation(); clearUploadSelection(); });
-}
+dzClear?.addEventListener("click", (e) => { e.stopPropagation(); clearUploadSelection(); });
 
 // ======= drag & drop + click =======
-if (drop) {
-	drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("dragover"); });
-	drop.addEventListener("dragleave", () => drop.classList.remove("dragover"));
-	drop.addEventListener("drop", e => {
+drop?.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("dragover"); });
+drop?.addEventListener("dragleave", () => drop.classList.remove("dragover"));
+drop?.addEventListener("drop", e => {
+	e.preventDefault();
+	drop.classList.remove("dragover");
+	handleFile(e.dataTransfer.files?.[0]);
+});
+drop?.addEventListener("click", () => input?.click());
+drop?.addEventListener("keydown", (e) => {
+	if (e.key === "Enter" || e.code === "Space") {
 		e.preventDefault();
-		drop.classList.remove("dragover");
-		handleFile(e.dataTransfer.files?.[0]);
-	});
-	drop.addEventListener("click", () => input && input.click());
-	drop.addEventListener("keydown", (e) => {
-		if (e.key === "Enter" || e.code === "Space") {
-			e.preventDefault();
-			input && input.click();
-		}
-	});
-}
-if (input) {
-	input.addEventListener("change", e => handleFile(e.target.files?.[0]));
-}
+		input?.click();
+	}
+});
+input?.addEventListener("change", e => handleFile(e.target.files?.[0]));
 
 function handleFile(file) {
 	if (!file) return;
-
 	if (!validExt(file.name)) {
 		setStatus("Formato não suportado. Envie .mp4 ou .avi", "error");
 		sendBtn.disabled = true;
@@ -200,126 +183,120 @@ function updateDownPercent() {
 	const val = parseFloat(downRange.value || "1");
 	downValue.textContent = `${Math.round(val * 100)}%`;
 }
-downRange.addEventListener("input", updateDownPercent);
+downRange?.addEventListener("input", updateDownPercent);
 updateDownPercent();
 
-// ======= enviar com XHR + progresso =======
-sendBtn.addEventListener("click", () => {
+// ======= API helpers =======
+async function uploadFile(file) {
+	const fd = new FormData();
+	fd.append("file", file);
+	const r = await fetch("/upload", { method: "POST", body: fd });
+	const j = await r.json();
+	if (!r.ok || !j.filename) throw new Error(j.message || "Falha no upload");
+	return j.filename;
+}
+async function createJob(inputFilename) {
+	const body = {
+		input_filename: inputFilename,
+		preset: (presetSel?.value || "") || undefined,
+		multi: multiInput.value ? parseInt(multiInput.value, 10) : undefined,
+		fps_alvo: fpsInput.value ? parseInt(fpsInput.value, 10) : undefined,
+		downscale: downRange.value ? parseFloat(downRange.value) : undefined,
+		manter_audio: true
+	};
+	Object.keys(body).forEach(k => body[k] === undefined && delete body[k]);
+	const r = await fetch("/api/jobs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+	const j = await r.json();
+	if (!r.ok || j.code === "ERROR") throw new Error(j.message || "Erro ao criar job");
+	return j.data;
+}
+async function pollJob(id, token) {
+	while (true) {
+		if (stopPolling) return { status: "canceled" };
+		const r = await fetch(`/api/jobs/${id}?token=${encodeURIComponent(token)}`);
+		const j = await r.json();
+		if (!r.ok || j.code === "ERROR") throw new Error(j.message || "Erro no status");
+		const d = j.data;
+		const pct = typeof d.progresso === "number" ? d.progresso * 100 : 0;
+		setProgress(pct, d.status_label_pt + (d.etapa ? ` • ${d.etapa}` : ""));
+		if (["completed", "failed", "canceled"].includes(d.status)) return d;
+		await new Promise(res => setTimeout(res, 900));
+	}
+}
+
+// ======= fluxo principal =======
+sendBtn.addEventListener("click", async () => {
 	if (!selectedFile) return;
 
 	// mostra original
-	if (originalUrl) originalVideo.src = originalUrl;
+	originalVideo.src = originalUrl;
 	colOriginal.classList.remove("hidden");
 	colProcessed.classList.add("hidden");
 	hideDropPreview();
 	setStatus("Enviando e processando… aguarde.");
 	sendBtn.disabled = true;
 
-	// prepara barra
 	showProgress();
-	setProgress(0, "Preparando…");
+	setProgress(10, "Enviando…");
+	showCancel();
+	try {
+		const savedName = await uploadFile(selectedFile);
+		setProgress(30, "Criando job…");
+		const job = await createJob(savedName);
+		currentJob = { id: job.id, token: job.token };
 
-	// monta formdata
-	const fd = new FormData();
-	fd.append("video", selectedFile);
-	const m = parseInt(multiInput.value, 10);
-	if (!Number.isNaN(m)) fd.append("multi", String(Math.max(1, m)));
-	const f = parseInt(fpsInput.value, 10);
-	if (!Number.isNaN(f)) fd.append("fps", String(f));
-	fd.append("down", String(parseFloat(downRange.value) * 0.25)); 
+		const final = await pollJob(job.id, job.token);
 
-	const xhr = new XMLHttpRequest();
-	xhr.open("POST", "/interpolate");
-	xhr.responseType = "blob";
+		if (final.status === "completed" && final.result_url) {
+			// mesma URL do botão de download
+			const playUrl = new URL(final.result_url, location.origin);
+			playUrl.searchParams.set("download", "1");
+			playUrl.searchParams.set("_", Date.now().toString()); // cache-buster
 
-	// Upload: 0–45%
-	xhr.upload.onprogress = (e) => {
-		if (e.lengthComputable) {
-			setProgress((e.loaded / e.total) * 45, "Enviando…");
+			processedVideo.srcObject = null;
+			processedVideo.preload = "auto";
+			processedVideo.src = playUrl.toString();
+			processedVideo.muted = true;      // opcional (autoplay)
+			processedVideo.load();
+
+			colProcessed.classList.remove("hidden");
+
+			// botão de download igual
+			downloadLink.href = playUrl.toString();
+
+			// nome sugerido
+			const name = selectedFile.name;
+			const dot = name.lastIndexOf(".");
+			const stem = dot >= 0 ? name.slice(0, dot) : name;
+			const ext = dot >= 0 ? name.slice(dot) : ".mp4";
+			const fps = fpsInput.value ? parseInt(fpsInput.value, 10) : undefined;
+			const suggest = fps ? `${stem}_interp_${fps}fps${ext}` : `${stem}_interp${ext}`;
+			downloadLink.setAttribute("download", suggest);
+
+			setStatus("Processamento concluído ✔", "ok");
+			setProgress(100, "Concluído");
 		}
-	};
-	xhr.upload.onload = () => {
-		setProgress(45, "Upload concluído");
-		startIndeterminate("Processando no servidor…");
-	};
 
-	// Download: 45–100%
-	xhr.onprogress = (e) => {
-		if (e.lengthComputable) {
-			stopIndeterminate();
-			const pct = 45 + (e.loaded / e.total) * 55;
-			setProgress(pct, "Baixando resultado…");
-		} else {
-			// continua indeterminado até termos tamanho
-			startIndeterminate("Baixando resultado…");
+		else if (final.status === "failed") {
+			setStatus(`Falha: ${final.message || "erro"}`, "error");
+			hideProgress();
+		} else if (final.status === "canceled") {
+			setStatus("Job cancelado", "warning");
+			hideProgress();
 		}
-	};
-
-	xhr.onerror = () => {
-		stopIndeterminate();
-		setStatus("Falha de rede.", "error");
+	} catch (e) {
+		console.error(e);
+		setStatus(e.message || "Erro inesperado", "error");
 		hideProgress();
+	} finally {
 		sendBtn.disabled = false;
-	};
-
-	xhr.onload = () => {
-		stopIndeterminate();
-		if (xhr.status !== 200) {
-			const ct = xhr.getResponseHeader("content-type") || "";
-			if (ct.includes("application/json")) {
-				readBlobAsText(xhr.response, (err, txt) => {
-					if (err) {
-						setStatus("Erro no processamento.", "error");
-					} else {
-						try {
-							const j = JSON.parse(txt);
-							setStatus(j?.error || j?.message || "Erro no processamento.", "error");
-						} catch {
-							setStatus("Erro no processamento.", "error");
-						}
-					}
-					hideProgress();
-					sendBtn.disabled = false;
-				});
-			} else {
-				setStatus("Erro no processamento.", "error");
-				hideProgress();
-				sendBtn.disabled = false;
-			}
-			return;
-		}
-
-		// sucesso
-		const blob = xhr.response;
-		if (processedUrl) URL.revokeObjectURL(processedUrl);
-		processedUrl = URL.createObjectURL(blob);
-
-		processedVideo.src = processedUrl;
-		colProcessed.classList.remove("hidden");
-
-		const cd = xhr.getResponseHeader("content-disposition");
-		const filename = parseFilenameFromContentDisposition(cd) || "processed_video.mp4";
-		downloadLink.href = processedUrl;
-		downloadLink.setAttribute("download", filename);
-
-		const avg = xhr.getResponseHeader("x-avg-fps");
-		const frames = xhr.getResponseHeader("x-frames");
-		const bits = [];
-		if (frames) bits.push(`${frames} frames`);
-		if (avg) bits.push(`média ${avg} FPS`);
-		setStatus(`Processamento concluído! ${bits.join(" • ")}`, "ok");
-
-		setProgress(100, "Concluído");
-		// opcional: esconder depois de um tempo
-		// setTimeout(hideProgress, 1200);
-		sendBtn.disabled = false;
-	};
-
-	xhr.send(fd);
+		hideCancel();
+	}
 });
 
-// ======= limpar blobs ao sair =======
+// ======= cleanup =======
 window.addEventListener("beforeunload", () => {
 	if (originalUrl) URL.revokeObjectURL(originalUrl);
-	if (processedUrl) URL.revokeObjectURL(processedUrl);
+	if (processedObjectUrl) URL.revokeObjectURL(processedObjectUrl);
+
 });

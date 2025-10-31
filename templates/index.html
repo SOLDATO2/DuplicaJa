@@ -123,7 +123,17 @@
                         </datalist>
                     </div>
                 </div>
-
+                <div class="field">
+                    <label for="preset" class="label">Preset</label>
+                    <select id="preset" class="input">
+                        <option value="">— Selecionar —</option>
+                        <option value="youtube_60fps">YouTube 60 fps</option>
+                        <option value="stories_30fps">Stories 30 fps</option>
+                        <option value="qualidade_120">Qualidade 120 fps</option>
+                        <option value="mobile_leve">Mobile leve (48 fps)</option>
+                    </select>
+                    <p class="hint">Selecionar um preset preenche/força os parâmetros do processamento.</p>
+                </div>
                 <button id="send-btn" class="btn primary large" disabled>Enviar</button>
                 <!-- Barra de progresso -->
                 <div id="progress-wrap" class="progress-wrap hidden" aria-live="polite">
@@ -135,6 +145,11 @@
                         <div id="p-bar" class="progress-bar"></div>
                         <div id="p-ind" class="progress-indeterminate hidden"></div>
                     </div>
+                </div>
+                <div class="actions" style="margin-top:.5rem">
+                    <button id="cancel-btn" class="btn danger outline hidden" type="button">
+                        Cancelar processamento
+                    </button>
                 </div>
 
                 <div id="status" class="status" aria-live="polite"></div>
