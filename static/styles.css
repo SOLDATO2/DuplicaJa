@@ -589,15 +589,3 @@ body {
 .hidden {
     display: none !important;
 }
-
-.meta-box{
-  border: 1px solid var(--outline);
-  border-radius: 12px;
-  background: rgba(0,0,0,.12);
-  padding: 10px 12px;
-  line-height: 1.3;
-  display: grid;
-  gap: 6px;
-  word-break: break-word;
-  margin-bottom: 12px;
-}
