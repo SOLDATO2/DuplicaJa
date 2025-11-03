@@ -7,7 +7,6 @@ const metaRes = document.getElementById("meta-res");
 const metaInFps = document.getElementById("meta-in-fps");
 const metaOutFps = document.getElementById("meta-out-fps");
 
-
 const drop = document.getElementById("dropzone");
 const input = document.getElementById("file-input");
 const dzInstructions = document.getElementById("dz-instructions");
@@ -30,15 +29,8 @@ const colProcessed = document.getElementById("col-processed");
 const processedVideo = document.getElementById("processed");
 const downloadLink = document.getElementById("download-link");
 
-// ======= NOVO: elementos dos RF-17/18/19/20 =======
-const notifyToggle = document.getElementById("notify-toggle"); // RF-17
-const copyBtn = document.getElementById("copy-btn");           // RF-19
-const resetBtn = document.getElementById("reset-btn");         // RF-18
-const presetSelect = document.getElementById("preset-select"); // RF-20
-const presetApplyBtn = document.getElementById("preset-apply");
-const presetSaveBtn = document.getElementById("preset-save");
-const presetRenameBtn = document.getElementById("preset-rename");
-const presetDeleteBtn = document.getElementById("preset-delete");
+// Botão de cancelar (opcional; pode não existir no HTML)
+const cancelBtn = document.getElementById("cancel-btn");
 
 // ======= estado =======
 const MAX_MB = 1024; // 1 GiB
@@ -46,6 +38,7 @@ const ALLOWED_EXTS = [".mp4", ".avi"];
 let selectedFile = null;
 let originalUrl = null;
 let processedUrl = null;
+let currentXhr = null; // se você ainda usar XHR em algum lugar
 
 // ======= storage (RF-18 / RF-20) =======
 const LS_PARAMS = "ffi:params";   // últimos valores
@@ -57,7 +50,7 @@ function currentParams() {
     multi: parseInt(multiInput.value || "1", 10) || 1,
     fps: fpsInput.value ? parseInt(fpsInput.value, 10) : "",
     down: parseFloat(downRange.value || "1"),
-    notify: !!(notifyToggle && notifyToggle.checked),
+    notify: !!(document.getElementById("notify-toggle")?.checked),
   };
 }
 
@@ -69,6 +62,7 @@ function applyParams(p) {
     downRange.value = String(x.down);
     updateDownPercent();
   }
+  const notifyToggle = document.getElementById("notify-toggle");
   if (notifyToggle) notifyToggle.checked = !!x.notify;
 }
 
@@ -97,6 +91,7 @@ function setPresets(list) {
   refreshPresetSelect();
 }
 function refreshPresetSelect() {
+  const presetSelect = document.getElementById("preset-select");
   if (!presetSelect) return;
   const list = getPresets();
   presetSelect.innerHTML = "";
@@ -169,21 +164,23 @@ let progressWrap, pBar, pInd, pLabel, pPercent;
     `;
     document.head.appendChild(style);
   }
-  progressWrap = document.createElement("div");
-  progressWrap.id = "progress-wrap";
-  progressWrap.className = "progress-wrap hidden";
-  progressWrap.setAttribute("aria-live", "polite");
-  progressWrap.innerHTML = `
-    <div class="progress-header">
-      <span id="p-label">Aguardando arquivo…</span>
-      <span id="p-percent">0%</span>
-    </div>
-    <div class="progress">
-      <div id="p-bar" class="progress-bar"></div>
-      <div id="p-ind" class="progress-indeterminate hidden"></div>
-    </div>
-  `;
-  statusEl.parentNode.insertBefore(progressWrap, statusEl);
+  progressWrap = document.getElementById("progress-wrap") || (() => {
+    const el = document.createElement("div");
+    el.id = "progress-wrap";
+    el.className = "progress-wrap hidden";
+    el.setAttribute("aria-live", "polite");
+    el.innerHTML = `
+      <div class="progress-header">
+        <span id="p-label">Aguardando arquivo…</span>
+        <span id="p-percent">0%</span>
+      </div>
+      <div class="progress">
+        <div id="p-bar" class="progress-bar"></div>
+        <div id="p-ind" class="progress-indeterminate hidden"></div>
+      </div>`;
+    statusEl.parentNode.insertBefore(el, statusEl);
+    return el;
+  })();
   pBar = progressWrap.querySelector("#p-bar");
   pInd = progressWrap.querySelector("#p-ind");
   pLabel = progressWrap.querySelector("#p-label");
@@ -204,6 +201,17 @@ function startIndeterminate(label) {
 }
 function stopIndeterminate() { pInd.classList.add("hidden"); }
 
+// ======= cancelar: habilitar/desabilitar (nunca esconder) =======
+function enableCancel() { if (cancelBtn) cancelBtn.disabled = false; }
+function disableCancel() { if (cancelBtn) cancelBtn.disabled = true; }
+
+function resetUIAfterCancel() {
+  hideProgress();
+  colProcessed.classList.add("hidden");
+  sendBtn.disabled = false;
+  disableCancel();
+}
+
 // ======= limpar seleção =======
 function clearUploadSelection() {
   if (originalUrl) { URL.revokeObjectURL(originalUrl); originalUrl = null; }
@@ -217,6 +225,8 @@ function clearUploadSelection() {
   colProcessed.classList.add("hidden");
   setStatus("Selecione um vídeo para começar.");
   hideProgress();
+  disableCancel();
+  if (currentXhr) { try { currentXhr.abort(); } catch {} currentXhr = null; }
 }
 if (dzClear) dzClear.addEventListener("click", (e) => { e.stopPropagation(); clearUploadSelection(); });
 
@@ -258,17 +268,15 @@ function handleFile(file) {
 
   showDropPreview(originalUrl);
 
-
   dzVideo.onloadedmetadata = () => {
-		if (dzVideo.videoWidth && dzVideo.videoHeight) {
-			metaRes.textContent = `${dzVideo.videoWidth}×${dzVideo.videoHeight}`;
-		} else {
-			metaRes.textContent = "—";
-		}
-		metaInFps.textContent = "—";   // FPS virá do servidor
-		metaOutFps.textContent = "—";
-	};
-
+    if (dzVideo.videoWidth && dzVideo.videoHeight) {
+      metaRes.textContent = `${dzVideo.videoWidth}×${dzVideo.videoHeight}`;
+    } else {
+      metaRes.textContent = "—";
+    }
+    metaInFps.textContent = "—";
+    metaOutFps.textContent = "—";
+  };
 
   showInfo(file);
   setStatus("Arquivo pronto para envio.");
@@ -279,6 +287,7 @@ function handleFile(file) {
   processedVideo.removeAttribute("src");
   processedVideo.load();
   downloadLink.href = "#";
+  disableCancel(); // nada para cancelar ainda
 }
 
 // ======= slider down =======
@@ -295,14 +304,13 @@ downRange.addEventListener("input", () => {
 function clampMulti() {
   let v = parseInt(multiInput.value, 10);
   if (Number.isNaN(v) || v < 1) v = 1;
-  // RF-15: limitar combo pelo cliente também (servidor é autoridade)
-  if (v > 4) v = 4; // combinado com ALLOWED_MULTIS do servidor
+  if (v > 4) v = 4;
   if (String(v) !== multiInput.value) multiInput.value = String(v);
 }
 multiInput.addEventListener("input", clampMulti);
 multiInput.addEventListener("blur", clampMulti);
 
-// RF-15: validações leves no cliente (máximo de FPS de saída quando fps explicitado)
+// RF-15: validações leves no cliente
 function clientValidate() {
   const vMulti = parseInt(multiInput.value || "1", 10);
   const vFps = fpsInput.value ? parseInt(fpsInput.value, 10) : null;
@@ -321,15 +329,16 @@ function clientValidate() {
   });
 });
 
-
-// ======= NOVO: carregar últimos valores (RF-18) =======
+// carregar últimos valores + presets
 loadParamsFromStorage();
 refreshPresetSelect();
-[multiInput, fpsInput, downRange, notifyToggle].forEach(el => {
+["multi","fps","down","notify-toggle"].forEach(id => {
+  const el = document.getElementById(id);
   if (el) el.addEventListener("input", () => saveParamsToStorage());
 });
 
-// ======= NOVO: copiar parâmetros (RF-19) =======
+// copiar parâmetros
+const copyBtn = document.getElementById("copy-btn");
 if (copyBtn) {
   copyBtn.addEventListener("click", async () => {
     const payload = JSON.stringify(currentParams());
@@ -337,7 +346,6 @@ if (copyBtn) {
       await navigator.clipboard.writeText(payload);
       setStatus("Parâmetros copiados (JSON).", "ok");
     } catch {
-      // fallback
       const ta = document.createElement("textarea");
       ta.value = payload; document.body.appendChild(ta);
       ta.select();
@@ -348,10 +356,17 @@ if (copyBtn) {
   });
 }
 
-// ======= NOVO: reset para padrão (RF-18) =======
-if (resetBtn) resetBtn.addEventListener("click", () => { resetToDefaults(); });
+// reset padrão
+const resetBtn = document.getElementById("reset-btn");
+if (resetBtn) resetBtn.addEventListener("click", resetToDefaults);
 
-// ======= NOVO: presets locais (RF-20) =======
+// presets locais
+const presetSaveBtn = document.getElementById("preset-save");
+const presetApplyBtn = document.getElementById("preset-apply");
+const presetRenameBtn = document.getElementById("preset-rename");
+const presetDeleteBtn = document.getElementById("preset-delete");
+const presetSelect = document.getElementById("preset-select");
+
 if (presetSaveBtn) {
   presetSaveBtn.addEventListener("click", () => {
     const name = prompt("Nome do preset:");
@@ -399,10 +414,11 @@ if (presetDeleteBtn) {
   });
 }
 
-// ======= NOVO: notificação (RF-17) =======
+// notificação (opcional)
 function maybeNotify(title, body) {
-  if (!notifyToggle || !notifyToggle.checked) return;           // só se usuário habilitar
-  if (!("Notification" in window)) return;                      // browser sem suporte
+  const notifyToggle = document.getElementById("notify-toggle");
+  if (!notifyToggle || !notifyToggle.checked) return;
+  if (!("Notification" in window)) return;
   if (Notification.permission === "granted") {
     new Notification(title, { body });
   } else if (Notification.permission === "default") {
@@ -412,141 +428,150 @@ function maybeNotify(title, body) {
   }
 }
 
-// ======= enviar com XHR + progresso =======
-sendBtn.addEventListener("click", () => {
+// ======= FETCH helpers que nunca quebram com HTML de erro =======
+async function parseMaybeJson(response) {
+  const ct = response.headers.get("content-type") || "";
+  const raw = await response.text(); // sempre como texto
+  let data = null;
+  if (ct.includes("application/json")) {
+    try { data = JSON.parse(raw); } catch {}
+  }
+  return { data, raw, ct };
+}
+
+// ======= API helpers (jobs REST) =======
+async function uploadFile(file){
+  const fd = new FormData();
+  fd.append("file", file);            // /upload aceita "file"
+  const r = await fetch("/upload", { method: "POST", body: fd });
+  const { data, raw } = await parseMaybeJson(r);
+  if (!r.ok) {
+    const msg = data?.message || data?.error || raw.slice(0, 500) || `HTTP ${r.status}`;
+    throw new Error(msg);
+  }
+  if (!data?.filename) throw new Error("Resposta inesperada do /upload.");
+  return data.filename;
+}
+
+async function createJob(inputFilename){
+  const body = {
+    input_filename: inputFilename,
+    multi: parseInt(multiInput.value||"1",10),
+    fps_alvo: fpsInput.value ? parseInt(fpsInput.value,10) : undefined,
+    downscale: parseFloat(downRange.value||"1"),
+    manter_audio: !(audioRemove?.checked),
+  };
+  Object.keys(body).forEach(k => body[k]===undefined && delete body[k]);
+
+  const r = await fetch("/api/jobs", {
+    method: "POST",
+    headers: { "Content-Type":"application/json" },
+    body: JSON.stringify(body)
+  });
+  const { data, raw } = await parseMaybeJson(r);
+  if (!r.ok || data?.code === "ERROR") {
+    const msg = data?.message || raw.slice(0, 500) || `HTTP ${r.status}`;
+    throw new Error(msg);
+  }
+  if (!data?.data?.id || !data?.data?.token) {
+    throw new Error("Resposta inesperada ao criar job.");
+  }
+  return data.data; // { id, token, ... }
+}
+
+async function pollJob(id, token){
+  while (true){
+    const r = await fetch(`/api/jobs/${id}?token=${encodeURIComponent(token)}`);
+    const { data, raw } = await parseMaybeJson(r);
+    if (!r.ok || data?.code === "ERROR") {
+      const msg = data?.message || raw.slice(0, 500) || `HTTP ${r.status}`;
+      throw new Error(msg);
+    }
+    const d = data?.data;
+    if (!d) throw new Error("Resposta inesperada no status do job.");
+
+    if (typeof d.progresso === "number") {
+      setProgress(Math.round(d.progresso * 100), d.status_label_pt || "Processando…");
+    }
+    if (["completed","failed","canceled"].includes(d.status)) return d;
+    await new Promise(res => setTimeout(res, 900));
+  }
+}
+
+function showResult(d){
+  // URL inline para <video> (NÃO usar download=1)
+  const playUrl = new URL(d.result_url);
+  playUrl.searchParams.set("_", Date.now().toString()); // cache-buster
+
+  processedVideo.srcObject = null;
+  processedVideo.preload = "auto";
+  processedVideo.muted = true; // ajuda autoplay
+  processedVideo.src = playUrl.toString();
+  processedVideo.load();
+  processedVideo.play?.().catch(()=>{});
+  colProcessed.classList.remove("hidden");
+
+  // link de download separado
+  const dlUrl = new URL(d.result_url);
+  dlUrl.searchParams.set("download", "1");
+  dlUrl.searchParams.set("_", Date.now().toString());
+  downloadLink.href = dlUrl.toString();
+  downloadLink.setAttribute("download", "processed_video.mp4");
+}
+
+// ======= fluxo com api_jobs (upload -> criar job -> poll -> tocar) =======
+sendBtn.addEventListener("click", async () => {
   if (!selectedFile) return;
 
-  // mostra original
+  // UI inicial
   if (originalUrl) originalVideo.src = originalUrl;
   colOriginal.classList.remove("hidden");
   colProcessed.classList.add("hidden");
   hideDropPreview();
-  setStatus("Enviando e processando… aguarde.");
+  setStatus("Enviando e processando…");
   sendBtn.disabled = true;
+  showProgress(); setProgress(10, "Enviando…");
 
-  // prepara barra
-  showProgress();
-  setProgress(0, "Preparando…");
+  try {
+    const filename = await uploadFile(selectedFile);
+    setProgress(30, "Criando job…");
+    const job = await createJob(filename);      // => { id, token, ... }
 
-  // monta formdata
-  const fd = new FormData();
-  fd.append("video", selectedFile);
-  const m = parseInt(multiInput.value, 10);
-  if (!Number.isNaN(m)) fd.append("multi", String(Math.max(1, m)));
-  const f = parseInt(fpsInput.value, 10);
-  if (!Number.isNaN(f)) fd.append("fps", String(f));
+    setProgress(45, "Na fila/Processando…");
+    const final = await pollJob(job.id, job.token);
 
-  // ADICIONADO: escolha de áudio
-  const audioChoice = (audioRemove && audioRemove.checked) ? "remove" : "keep";
-  fd.append("audio", audioChoice);
-
-  // IMPORTANTE: corrigido bug do front — envia o valor de 'down' sem multiplicar
-  fd.append("down", String(parseFloat(downRange.value))); // (antes havia *0.25)  :contentReference[oaicite:4]{index=4}
-
-  const xhr = new XMLHttpRequest();
-  xhr.open("POST", "/interpolate");
-  xhr.responseType = "blob";
-
-  // Upload: 0–45%
-  xhr.upload.onprogress = (e) => {
-    if (e.lengthComputable) {
-      setProgress((e.loaded / e.total) * 45, "Enviando…");
+    if (final.status === "completed" && final.result_url){
+      setProgress(95, "Preparando player…");
+      showResult(final);
+      setStatus("Processamento concluído ✔", "ok");
+      setProgress(100, "Concluído");
+    } else if (final.status === "failed"){
+      setStatus(final.message || "Falha no job.", "error");
+      hideProgress();
+    } else if (final.status === "canceled"){
+      setStatus("Job cancelado.", "warning");
+      hideProgress();
     }
-  };
-  xhr.upload.onload = () => {
-    setProgress(45, "Upload concluído");
-    startIndeterminate("Processando no servidor…");
-  };
-
-  // Download: 45–100%
-  xhr.onprogress = (e) => {
-    if (e.lengthComputable) {
-      stopIndeterminate();
-      const pct = 45 + (e.loaded / e.total) * 55;
-      setProgress(pct, "Baixando resultado…");
-    } else {
-      startIndeterminate("Baixando resultado…");
-    }
-  };
-
-  xhr.onerror = () => {
-    stopIndeterminate();
-    setStatus("Falha de rede.", "error");
+  } catch (e){
+    console.error(e);
+    setStatus(String(e?.message || e), "error");
     hideProgress();
+  } finally {
     sendBtn.disabled = false;
-    maybeNotify("Falha no processamento", "Houve um erro de rede.");
-  };
-
-  xhr.onload = () => {
-    stopIndeterminate();
-    if (xhr.status !== 200) {
-      const ct = xhr.getResponseHeader("content-type") || "";
-      if (ct.includes("application/json")) {
-        readBlobAsText(xhr.response, (err, txt) => {
-          if (err) {
-            setStatus("Erro no processamento.", "error");
-          } else {
-            try {
-              const j = JSON.parse(txt);
-              setStatus(j?.error || j?.message || "Erro no processamento.", "error");
-            } catch {
-              setStatus("Erro no processamento.", "error");
-            }
-          }
-          hideProgress();
-          sendBtn.disabled = false;
-          maybeNotify("Falha no processamento", "O servidor retornou um erro.");
-        });
-      } else {
-        setStatus("Erro no processamento.", "error");
-        hideProgress();
-        sendBtn.disabled = false;
-        maybeNotify("Falha no processamento", "O servidor retornou um erro.");
-      }
-      return;
-    }
-
-    // sucesso
-    const blob = xhr.response;
-    if (processedUrl) URL.revokeObjectURL(processedUrl);
-    processedUrl = URL.createObjectURL(blob);
-
-    processedVideo.src = processedUrl;
-    colProcessed.classList.remove("hidden");
-
-    const cd = xhr.getResponseHeader("content-disposition");
-    const filename = parseFilenameFromContentDisposition(cd) || "processed_video.mp4";
-    downloadLink.href = processedUrl;
-    downloadLink.setAttribute("download", filename);
-
-    // ADICIONADO: ler novos headers de metadados e atualizar UI
-    const inFps = xhr.getResponseHeader("x-input-fps");
-    const outFps = xhr.getResponseHeader("x-output-fps");
-    const inRes = xhr.getResponseHeader("x-input-res");
-
-    if (inRes) metaRes.textContent = inRes;
-    if (inFps) metaInFps.textContent = parseFloat(inFps).toFixed(3);
-    if (outFps) metaOutFps.textContent = parseFloat(outFps).toFixed(3);
-
-    const avg = xhr.getResponseHeader("x-avg-fps");
-    const frames = xhr.getResponseHeader("x-frames");
-    const bits = [];
-    if (frames) bits.push(`${frames} frames`);
-    if (avg) bits.push(`média ${avg} FPS`);
-    setStatus(`Processamento concluído! ${bits.join(" • ")}`, "ok");
-
-    setProgress(100, "Concluído");
-    sendBtn.disabled = false;
-
-    // RF-17: notificação opcional ao concluir
-    maybeNotify("Interpolação concluída", bits.join(" • ") || "Seu vídeo está pronto.");
-  };
-
-  xhr.send(fd);
+  }
 });
+
+// Botão cancelar (se existir no HTML): aqui não cancela no servidor, só abortaria XHR se usado.
+// Você pode implementar cancelamento real chamando POST /api/jobs/<id>/cancel com token.
+if (cancelBtn) {
+  cancelBtn.addEventListener("click", () => {
+    setStatus("Cancelamento local não implementado para jobs assíncronos.", "warn");
+  });
+}
 
 // ======= limpar blobs ao sair =======
 window.addEventListener("beforeunload", () => {
   if (originalUrl) URL.revokeObjectURL(originalUrl);
   if (processedUrl) URL.revokeObjectURL(processedUrl);
+  if (currentXhr) { try { currentXhr.abort(); } catch {} }
 });

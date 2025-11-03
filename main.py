@@ -9,8 +9,12 @@ from concurrent.futures import ThreadPoolExecutor, Future
 import cv2, subprocess, shlex  # + novos
 
 import torch
-from flask import Flask, render_template, request, send_file, jsonify, abort
-from werkzeug.exceptions import RequestEntityTooLarge
+from flask import Flask, render_template, request, send_file, jsonify, abort, redirect, url_for
+from werkzeug.exceptions import RequestEntityTooLarge, HTTPException
+from api_jobs import jobs_bp
+from pathlib import Path
+from werkzeug.utils import secure_filename
+
 
 from model.model import FlowNet
 from model.util import interpolate_video
@@ -34,7 +38,12 @@ ALLOWED_MULTIS = {1, 2, 3, 4}
 MIN_DOWN, MAX_DOWN = 0.25, 1.0
 
 app = Flask(__name__)
+app.register_blueprint(jobs_bp, url_prefix="/api")
 app.config.update(MAX_CONTENT_LENGTH=MAX_CONTENT_LENGTH)
+
+@app.errorhandler(HTTPException)
+def _http_error(e: HTTPException):
+    return jsonify({"code": "ERROR", "message": e.description or e.name, "details": None}), e.code or 500
 
 def api_error(status, code, message, details=None):
     payload = {"code": code, "message": message}
@@ -100,6 +109,23 @@ def index():
 @app.get("/saude")
 def saude():
     return "Sistema ativo!"
+
+# ------ Rota de upload (o front manda o arquivo aqui antes do /api/jobs) ------
+UPLOAD_DIR = Path("static/uploads"); UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+@app.post("/upload")
+def upload():
+    if "file" in request.files:
+        f = request.files["file"]
+    elif "video" in request.files:  # compatibilidade com seu app.js antigo
+        f = request.files["video"]
+    else:
+        return jsonify({"code":"ERROR","message":"campo 'file' não encontrado","details":None}), 400
+
+    fname = secure_filename(f.filename or "video.mp4")
+    savepath = (UPLOAD_DIR / fname).resolve()
+    f.save(savepath)
+    return jsonify({"filename": fname})
 
 # ============================ Suporte a /interpolate síncrono (RNF-05) ======
 @app.post("/interpolate")
