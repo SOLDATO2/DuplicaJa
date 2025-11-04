@@ -58,7 +58,6 @@ def _http(e: HTTPException):
     return _err(e.code or 500, e.description or e.name)
 
 import mimetypes
-import os
 import shutil
 import subprocess
 import tempfile
@@ -116,7 +115,6 @@ def ensure_web_mp4(src_path: str) -> str:
         ok, frame = cap.read()
         if not ok:
             break
-        # garante 8-bit BGR -> yuv420p é do encoder; aqui só escrevemos
         writer.write(frame)
 
     cap.release()
@@ -269,8 +267,8 @@ def _out_name(input_name: str, fps: Optional[int]) -> str:
     return f"{stem}_interp_{int(fps)}fps{ext}" if fps else f"{stem}_interp{ext}"
 
 def _interpolate_task(src_path: str, out_path: str, multi: int, fps_override: int | None, down: float):
-    # roda a tarefa real (processo separado)
-    avg_fps, frames = interpolate_video(
+    # roda a tarefa real (processo separado) — retorna 6 valores
+    avg_fps, frames, fps_in, fps_out, W, H = interpolate_video(
         in_path=src_path,
         out_path=out_path,
         multi=multi,
@@ -282,7 +280,8 @@ def _interpolate_task(src_path: str, out_path: str, multi: int, fps_override: in
     # Guardamos as métricas em um arquivo sidecar simples (para não perder no processo)
     sidecar = out_path + ".meta"
     with open(sidecar, "w", encoding="utf-8") as f:
-        f.write(f"{avg_fps}|{frames}")
+        # Escreve 6 campos; leitura no worker é retrocompatível (2–6)
+        f.write(f"{avg_fps}|{frames}|{fps_in}|{fps_out}|{W}|{H}")
 
 def _worker(job: Job):
     try:
@@ -332,15 +331,21 @@ def _worker(job: Job):
         if p.exitcode != 0:
             raise RuntimeError("processo de interpolação terminou com erro")
 
-        # lê sidecar
+        # lê sidecar (retrocompatível: aceita 2 a 6 campos)
         meta_path = str(out) + ".meta"
         avg_fps = None; frames = None
+        fps_in = None; fps_out = None; W = None; H = None
         try:
             with open(meta_path, "r", encoding="utf-8") as f:
                 txt = f.read().strip()
                 parts = txt.split("|")
-                if len(parts) == 2:
-                    avg_fps = float(parts[0]); frames = int(parts[1])
+                if len(parts) >= 2:
+                    avg_fps = float(parts[0]) if parts[0] != "" else None
+                    frames  = int(parts[1])   if parts[1] != "" else None
+                if len(parts) >= 3 and parts[2] != "": fps_in  = float(parts[2])
+                if len(parts) >= 4 and parts[3] != "": fps_out = float(parts[3])
+                if len(parts) >= 5 and parts[4] != "": W       = int(parts[4])
+                if len(parts) >= 6 and parts[5] != "": H       = int(parts[5])
         except Exception:
             pass
 
@@ -480,4 +485,24 @@ def get_result(id: str):
 
     resp.headers["Accept-Ranges"] = "bytes"
     resp.headers["Cache-Control"] = "no-store"
+
+    # === Adiciona X-headers a partir do sidecar (se existir) ===
+    try:
+        meta_path = str(path) + ".meta"
+        if os.path.exists(meta_path):
+            with open(meta_path, "r", encoding="utf-8") as f2:
+                parts = f2.read().strip().split("|")
+            if len(parts) >= 1 and parts[0]:
+                resp.headers["X-Avg-FPS"]   = f"{float(parts[0]):.2f}"
+            if len(parts) >= 2 and parts[1]:
+                resp.headers["X-Frames"]    = str(int(parts[1]))
+            if len(parts) >= 3 and parts[2]:
+                resp.headers["X-Input-FPS"] = f"{float(parts[2]):.3f}"
+            if len(parts) >= 4 and parts[3]:
+                resp.headers["X-Output-FPS"]= f"{float(parts[3]):.3f}"
+            if len(parts) >= 6 and parts[4] and parts[5]:
+                resp.headers["X-Input-Res"] = f"{int(parts[4])}x{int(parts[5])}"
+    except Exception:
+        pass
+
     return resp

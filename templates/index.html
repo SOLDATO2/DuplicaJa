@@ -123,17 +123,68 @@
                         </datalist>
                     </div>
                 </div>
+
+                <!-- -->
+                <!-- Preferências -->
                 <div class="field">
-                    <label for="preset" class="label">Preset</label>
-                    <select id="preset" class="input">
-                        <option value="">— Selecionar —</option>
-                        <option value="youtube_60fps">YouTube 60 fps</option>
-                        <option value="stories_30fps">Stories 30 fps</option>
-                        <option value="qualidade_120">Qualidade 120 fps</option>
-                        <option value="mobile_leve">Mobile leve (48 fps)</option>
-                    </select>
-                    <p class="hint">Selecionar um preset preenche/força os parâmetros do processamento.</p>
+                    <label class="label">Preferências</label>
+                    <label class="input" style="display:flex;align-items:center;gap:8px;padding:10px;">
+                        <input id="notify-toggle" type="checkbox" />
+                        <span>Notificar ao concluir</span>
+                    </label>
                 </div>
+
+                <!-- Áudio (RF-12) -->
+                <div class="field">
+                    <label class="label">Áudio</label>
+                    <div class="input" style="display:flex;gap:16px;align-items:center;padding:10px;">
+                        <label style="display:flex;align-items:center;gap:6px;">
+                            <input type="radio" name="audio" id="audio-keep" value="keep" checked>
+                            <span>Manter áudio</span>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:6px;">
+                            <input type="radio" name="audio" id="audio-remove" value="remove">
+                            <span>Remover áudio</span>
+                        </label>
+                    </div>
+                </div>
+
+
+                <!-- Presets (locais do navegador) -->
+                <div class="field">
+                    <label class="label">Presets</label>
+                    <div class="grid-2">
+                        <select id="preset-select" class="input" aria-label="Meus presets"></select>
+                        <div class="grid-2">
+                            <button id="preset-apply" class="btn" type="button">Aplicar</button>
+                            <button id="preset-save" class="btn" type="button">Salvar Atual</button>
+                        </div>
+                    </div>
+                    <div class="grid-2" style="margin-top:8px;">
+                        <button id="preset-rename" class="btn" type="button">Renomear</button>
+                        <button id="preset-delete" class="btn" type="button">Excluir</button>
+                    </div>
+                </div>
+
+                <!-- Ações auxiliares -->
+                <div class="grid-2">
+                    <button id="copy-btn" class="btn soft" type="button">Copiar parâmetros</button>
+                    <button id="reset-btn" class="btn soft" type="button">Restaurar padrão</button>
+                </div>
+
+                <!-- Informações do vídeo (RF-13) -->
+                <div class="field">
+                    <label class="label">Informações do vídeo</label>
+                    <div class="meta-box">
+                        <div>Resolução: <strong id="meta-res">—</strong></div>
+                        <div>FPS de entrada: <strong id="meta-in-fps">—</strong></div>
+                        <div>FPS de saída: <strong id="meta-out-fps">—</strong></div>
+                    </div>
+                </div>
+
+
+                <!-- -->
+
                 <button id="send-btn" class="btn primary large" disabled>Enviar</button>
                 <!-- Barra de progresso -->
                 <div id="progress-wrap" class="progress-wrap hidden" aria-live="polite">
@@ -147,11 +198,10 @@
                     </div>
                 </div>
                 <div class="actions" style="margin-top:.5rem">
-                    <button id="cancel-btn" class="btn danger outline hidden" type="button">
+                    <button id="cancel-btn" class="btn danger outline" type="button" disabled>
                         Cancelar processamento
                     </button>
                 </div>
-
                 <div id="status" class="status" aria-live="polite"></div>
             </form>
 
